@@ -87,7 +87,7 @@ class extension_formvalidation extends Extension {
 	 * @author Thomas Off
 	 **/
 	public function addFilterDocumentationToEvent($context) {
-		if (!in_array('akismet', $context['selected'])) {
+		if (!in_array('formvalidation', $context['selected'])) {
 			return;
 		}
 		
