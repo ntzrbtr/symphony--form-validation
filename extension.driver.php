@@ -1,6 +1,11 @@
 <?php
 
 /**
+ * Include external library for form validation.
+ */
+@require_once(EXTENSIONS . 'formvalidation/lib/validation.php');
+
+/**
  * Form validation extension class
  *
  * @package formvalidation
@@ -103,12 +108,15 @@ class extension_formvalidation extends Extension {
 	 * @author Thomas Off
 	 **/
 	public function processEventData($context) {
+		// Check whether something should be done at all.
 		if (!in_array('formvalidation', $context['event']->eParamFILTERS)) {
 			return;
 		}
 		
+		// Fetch data for this filter from the form ...
 		$mapping = $_POST['formvalidation'];
 		
+		// ... and check it for completeness.
 		if (!isset($mapping['formname'])) {
 			$context['messages'][] = array(
 				'formvalidation',
@@ -118,9 +126,12 @@ class extension_formvalidation extends Extension {
 			return;
 		}
 		
-		// Do the validation.
+		// Load the specified ruleset.
+		
+		// Do the validation using the loaded rules.
 		$result = true;
 		
+		// Return the result.
 		$context['messages'][] = array(
 			'formvalidation',
 			$result,
