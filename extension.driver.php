@@ -1,6 +1,11 @@
 <?php
 
 /**
+ * Include Symphony classes.
+ */
+@require_once(TOOLKIT . '/class.entrymanager.php');
+
+/**
  * Include external library for form validation.
  */
 @require_once(EXTENSIONS . '/formvalidation/lib/validation.php');
@@ -127,9 +132,18 @@ class extension_formvalidation extends Extension {
 		}
 		
 		// Load the specified ruleset.
+		$ruleset = $this->fetchRuleset($mapping['formname']);
 		
-		// Do the validation using the loaded rules.
-		$result = true;
+		// Continue only if a ruleset was found.
+		if (is_array($ruleset) && !empty($ruleset)) {
+			// Do the validation using the loaded rules.
+			$errors = validateFields($context['fields'], $ruleset);
+			$result = empty($errors);
+		}
+		else {
+			// Validation impossible and thus failed.
+			$result = false;
+		}
 		
 		// Return the result.
 		$context['messages'][] = array(
@@ -137,6 +151,38 @@ class extension_formvalidation extends Extension {
 			$result,
 			(!$result ? 'Errors detected in the form.' : NULL),
 		);
+	}
+	
+	/**
+	 * Fetch the ruleset stored in the specified record in the section and field as set in the preferences.
+	 *
+	 * @param string $entryId
+	 * @return array
+	 */
+	protected function fetchRuleset($entryId) {
+		// Initialize a SectionManager and fetch the section ID.
+		$sectionManager = new SectionManager($this->_Parent);
+		$sectionId = $sectionManager->fetchIDFromHandle($this->getSection());
+
+		// Initialize an EntryManager and fetch the entry.
+		$entryManager = new EntryManager($this->_Parent);
+		$entries = $entryManager->fetch($entryId, $sectionId);
+		
+		// Check the result.
+		if (!is_array($entries) || empty($entries)) {
+			return false;
+		}
+		
+		// Initialize a FieldManager and fetch the ruleset.
+		$fieldManager = new FieldManager($this->_Parent);
+		$fieldId = $fieldManager->fetchFieldIDFromElementName($this->getField());
+		$fieldData = $entries[0]->getData($fieldId);
+		$field = $fieldData['value'];
+		
+		// Split the ruleset by newlines into an array.
+		$field = preg_replace('/\r\n/', '\n', $field);
+		$field = preg_replace('/\r/', '\n', $field);
+		return explode('\n', $field);
 	}	
 	
 	/**
@@ -170,7 +216,7 @@ class extension_formvalidation extends Extension {
 	 *
 	 * @return string
 	 */
-	public function getSection(){
+	public function getSection() {
 		if (class_exists('ConfigurationAccessor')) {
 			return ConfigurationAccessor::get('section', 'formvalidation');
 		}	
@@ -182,7 +228,7 @@ class extension_formvalidation extends Extension {
 	 *
 	 * @return string
 	 */
-	public function getField(){
+	public function getField() {
 		if (class_exists('ConfigurationAccessor')) {
 			return ConfigurationAccessor::get('field', 'formvalidation');
 		}	
