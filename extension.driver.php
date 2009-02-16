@@ -1,154 +1,131 @@
 <?php
 
-	Class extension_akismet extends Extension{
+/**
+ * Form validation extension class
+ *
+ * @package formvalidation
+ * @author Thomas Off
+ **/
+class extension_formvalidation extends Extension {
 
-		public function about(){
-			return array('name' => 'Akismet Spam Filtering',
-						 'version' => '1.2',
-						 'release-date' => '2008-05-13',
-						 'author' => array('name' => 'Alistair Kearney',
-										   'website' => 'http://www.pointybeard.com',
-										   'email' => 'alistair@pointybeard.com'),
-						 'description' => 'Allows you to add a spam filter to your front end saving events.'
-				 		);
-		}
-		
-		public function getSubscribedDelegates(){
-			return array(
-						array(
-							'page' => '/blueprints/events/new/',
-							'delegate' => 'AppendEventFilter',
-							'callback' => 'addFilterToEventEditor'
-						),
-						
-						array(
-							'page' => '/blueprints/events/edit/',
-							'delegate' => 'AppendEventFilter',
-							'callback' => 'addFilterToEventEditor'
-						),
-						
-						array(
-							'page' => '/blueprints/events/new/',
-							'delegate' => 'AppendEventFilterDocumentation',
-							'callback' => 'addFilterDocumentationToEvent'
-						),
-											
-						array(
-							'page' => '/blueprints/events/edit/',
-							'delegate' => 'AppendEventFilterDocumentation',
-							'callback' => 'addFilterDocumentationToEvent'
-						),
-						
-						array(
-							'page' => '/system/preferences/',
-							'delegate' => 'AddCustomPreferenceFieldsets',
-							'callback' => 'appendPreferences'
-						),
-						
-						array(
-							'page' => '/frontend/',
-							'delegate' => 'EventPreSaveFilter',
-							'callback' => 'processEventData'
-						),						
-			);
-		}
-		
-		public function addFilterToEventEditor($context){
-			$context['options'][] = array('akismet', @in_array('akismet', $context['selected']) ,'Akismet Spam Filtering');		
-		}
-		
-		public function appendPreferences($context){
-			$group = new XMLElement('fieldset');
-			$group->setAttribute('class', 'settings');
-			$group->appendChild(new XMLElement('legend', 'Akismet Spam Filtering'));
-
-			$label = Widget::Label('Wordpress API Key');
-			$label->appendChild(Widget::Input('settings[akismet][api-key]', General::Sanitize($this->getWordpressApiKey())));		
-			$group->appendChild($label);
-			
-			$group->appendChild(new XMLElement('p', 'Get a Wordpress API key from the <a href="http://wordpress.com/api-keys/">Wordpress site</a>.', array('class' => 'help')));
-			
-			$context['wrapper']->appendChild($group);
-						
-		}
-		
-		public function addFilterDocumentationToEvent($context){
-			if(!in_array('akismet', $context['selected'])) return;
-			
-			$context['documentation'][] = new XMLElement('h3', 'Akismet Spam Filtering');
-			
-			$context['documentation'][] = new XMLElement('p', 'Each entry will be passed to the <a href="http://akismet.com/">Akismet Spam filtering service</a> before saving. Should it be deemed as spam, Symphony will terminate execution of the Event, thus preventing the entry from being saved. You will receive notification in the Event XML. <strong>Note: Be sure to set your Akismet API key in the <a href="'.URL.'/symphony/system/preferences/">Symphony Preferences</a>.</strong>');
-			
-			$context['documentation'][] = new XMLElement('p', 'The following is an example of the XML returned form this filter:');
-			$code = '<filter type="akismet" status="passed" />
-<filter type="akismet" status="failed">Author, Email and URL field mappings are required.</filter>
-<filter type="akismet" status="failed">Data was identified as spam.</filter>';
-
-			$context['documentation'][] = contentBlueprintsEvents::processDocumentationCode($code);
-
-			$context['documentation'][] = new XMLElement('p', 'In order to provide Akismet with a correct set of data, it is required that you provide field mappings of Author, Email and URL. The value of these mappings directly point to values in the <code>fields</code> array of <code>POST</code> data. To specify a literal value, enclose the hidden fields <code>value</code> attribute in single quotes. In the following example, <code>author</code>, <code>website</code> and <code>email</code> would correspond to <code>fields[author]</code>, <code>fields[website]</code> and <code>literal@email.com</code> respectively:');
-			
-			$code = '<input name="akismet[author]" value="author" type="hidden" />
-<input name="akismet[email]" value="'."\'".'literal@email.com'."\'".'" type="hidden" />
-<input name="akismet[url]" value="website" type="hidden" />			
-';
-			$context['documentation'][] = contentBlueprintsEvents::processDocumentationCode($code);
-			
-		}
-		
-		public function processEventData($context){
-			
-			if(!in_array('akismet', $context['event']->eParamFILTERS)) return;
-			
-			$mapping = $_POST['akismet'];
-			
-			if(!isset($mapping['author']) || !isset($mapping['email']) || !isset($mapping['url'])){
-				$context['messages'][] = array('akismet', false, 'Author, Email and URL field mappings are required.');
-				return;
-			}			
-			
-			foreach($mapping as $key => $val){
-				if(preg_match("/^'[^']+'$/", $val)) $mapping[$key] = trim($val, "'");
-				else $mapping[$key] = $context['fields'][$val];
-			}
-			
-		 	include_once(EXTENSIONS . '/akismet/lib/akismet.curl.class.php');
-
-	        $comment = array(
-	            'comment_type' => 'comment',
-	            'comment_author' => $mapping['author'],
-	            'comment_author_email' => $mapping['email'],
-	            'comment_author_url' => $mapping['url'],
-	            'comment_content' => implode($context['fields']),
-	            'permalink' => URL . $_REQUEST['page']
-	        );
-
-	        $akismet = new akismet($this->getWordpressApiKey(), URL);
-	        if(!$akismet->error) {
-	            $valid = !$akismet->is_spam($comment);
-	        }
-			
-			$context['messages'][] = array('akismet', $valid, (!$valid ? 'Data was identified as spam.' : NULL));
-			
-		}
-		
-		public function uninstall(){
-			
-			if(class_exists('ConfigurationAccessor'))
-				ConfigurationAccessor::remove('akismet');	
-			
-			else
-				$this->_Parent->Configuration->remove('akismet');	
-					
-			$this->_Parent->saveConfig();
-		}
-
-		public function getWordpressApiKey(){
-			if(class_exists('ConfigurationAccessor'))
-				return ConfigurationAccessor::get('api-key', 'akismet');
-					
-			return $this->_Parent->Configuration->get('api-key', 'akismet');
-		}		
-		
+	/**
+	 * Set array containing all the data for the 'About' page in the extension administration
+	 *
+	 * @return void
+	 * @author Thomas Off
+	 **/
+	public function about() {
+		return array(
+			'name' 			=> 'Form Validation',
+			'version' 		=> '1.0',
+			'release-date' 	=> '2009-02-16',
+			'author' 		=> array(
+				'name' 		=> 'Thomas Off',
+				'website' 	=> 'http://www.retiolum.de',
+				'email' 	=> 'info@retiolum.de',
+			),
+			'description' 	=> 'Allows you to add form validation based on regular expressions.'
+ 		);
 	}
-
+	
+	/**
+	 * Return an array containing the delegates that this extension subscribes itself to.
+	 *
+	 * @return array
+	 * @author Thomas Off
+	 **/
+	public function getSubscribedDelegates() {
+		return array(
+			array(
+				'page' 		=> '/blueprints/events/new/',
+				'delegate' 	=> 'AppendEventFilter',
+				'callback' 	=> 'addFilterToEventEditor',
+			),
+			array(
+				'page' 		=> '/blueprints/events/edit/',
+				'delegate' 	=> 'AppendEventFilter',
+				'callback' 	=> 'addFilterToEventEditor',
+			),
+			array(
+				'page' 		=> '/blueprints/events/new/',
+				'delegate' 	=> 'AppendEventFilterDocumentation',
+				'callback' 	=> 'addFilterDocumentationToEvent',
+			),					
+			array(
+				'page' 		=> '/blueprints/events/edit/',
+				'delegate' 	=> 'AppendEventFilterDocumentation',
+				'callback' 	=> 'addFilterDocumentationToEvent',
+			),
+			array(
+				'page' 		=> '/frontend/',
+				'delegate' 	=> 'EventPreSaveFilter',
+				'callback' 	=> 'processEventData',
+			),						
+		);
+	}
+	
+	/**
+	 * Add the event filter to the list for creating events.
+	 *
+	 * @param array $context
+	 * @return void
+	 * @author Thomas Off
+	 **/
+	public function addFilterToEventEditor($context) {
+		$context['options'][] = array(
+			'formvalidation',
+			@in_array('formvalidation', $context['selected']) ,
+			'Form Validation',
+		);
+	}
+	
+	/**
+	 * Add documentation for the filter to the event page.
+	 *
+	 * @param array $context
+	 * @return array
+	 * @author Thomas Off
+	 **/
+	public function addFilterDocumentationToEvent($context) {
+		if (!in_array('akismet', $context['selected'])) {
+			return;
+		}
+		
+		$context['documentation'][] = new XMLElement('h3', 'Form Validation');
+		$context['documentation'][] = new XMLElement('p', 'This filter gives you the possibility to add form validation based on regular expressions to your forms.');
+	}
+	
+	/**
+	 * Process the data from a form when the event is called.
+	 *
+	 * @param array $context
+	 * @return array
+	 * @author Thomas Off
+	 **/
+	public function processEventData($context) {
+		if (!in_array('formvalidation', $context['event']->eParamFILTERS)) {
+			return;
+		}
+		
+		$mapping = $_POST['formvalidation'];
+		
+		if (!isset($mapping['formname'])) {
+			$context['messages'][] = array(
+				'formvalidation',
+				false,
+				'The name of the form validation ruleset must be given.',
+			);
+			return;
+		}
+		
+		// Do the validation.
+		$result = true;
+		
+		$context['messages'][] = array(
+			'formvalidation',
+			$result,
+			(!$result ? 'Errors detected in the form.' : NULL),
+		);
+		
+	}	
+}
