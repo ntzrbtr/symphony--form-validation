@@ -98,10 +98,12 @@ class extension_formvalidation extends Extension {
 	 * @return array
 	 **/
 	public function addFilterDocumentationToEvent($context) {
+		// Check whether something should be done at all.
 		if (!in_array('formvalidation', $context['selected'])) {
 			return;
 		}
 		
+		// Add documentation text to the context.
 		$context['documentation'][] = new XMLElement('h3', 'Form Validation');
 		$context['documentation'][] = new XMLElement('p', 'This filter gives you the possibility to add form validation based on regular expressions to your forms.');
 	}
