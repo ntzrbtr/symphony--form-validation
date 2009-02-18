@@ -137,6 +137,7 @@ class extension_formvalidation extends Extension {
 		$ruleset = $this->fetchRuleset($mapping['formname']);
 		
 		// Continue only if a ruleset was found.
+		$errors = array();
 		if (is_array($ruleset) && !empty($ruleset)) {
 			// Do the validation using the loaded rules.
 			$errors = validateFields($context['fields'], $ruleset);
@@ -145,13 +146,22 @@ class extension_formvalidation extends Extension {
 		else {
 			// Validation impossible and thus failed.
 			$result = false;
+		}	
+			
+		// Convert the errors into a XML object.
+		$message = NULL;
+		if (!$result) {
+			$message = new XMLElement('errors');
+			foreach ($errors as $error) {
+				$message->appendChild(new XMLElement('error', General::sanitize($error)));
+			}
 		}
 		
 		// Return the result.
 		$context['messages'][] = array(
 			'formvalidation',
 			$result,
-			(!$result ? 'Errors detected in the form.' : NULL),
+			$message,
 		);
 	}
 	
