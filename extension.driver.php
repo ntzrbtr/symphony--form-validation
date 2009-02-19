@@ -26,14 +26,14 @@ class extension_formvalidation extends Extension {
 	public function about() {
 		return array(
 			'name' 			=> 'Form Validation',
-			'version' 		=> '1.0',
-			'release-date' 	=> '2009-02-16',
+			'version' 		=> '0.1',
+			'release-date' 	=> '2009-02-19',
 			'author' 		=> array(
 				'name' 		=> 'Thomas Off',
 				'website' 	=> 'http://www.retiolum.de',
 				'email' 	=> 'info@retiolum.de',
 			),
-			'description' 	=> 'Allows you to add form validation based on regular expressions.'
+			'description' 	=> 'Allows you to add extended validation to your forms.'
  		);
 	}
 	
@@ -105,7 +105,25 @@ class extension_formvalidation extends Extension {
 		
 		// Add documentation text to the context.
 		$context['documentation'][] = new XMLElement('h3', 'Form Validation');
-		$context['documentation'][] = new XMLElement('p', 'This filter gives you the possibility to add form validation based on regular expressions to your forms.');
+		$context['documentation'][] = new XMLElement('p', 'This extension adds the possibility for real form validation to Symphony.');
+		$context['documentation'][] = new XMLElement('p', 'The form validation is done by Benjamin Keen\'s \'PHP Validation\' script (http://www.benjaminkeen.com/software/php_validation/).');
+		$context['documentation'][] = new XMLElement('p', 'See the README.txt file shipped with the extension for installation details.');
+		$context['documentation'][] = new XMLElement('p', 'Upon error the filter returns an XML structure like the following:');
+		$code = <<<EOT
+<filter type="formvalidation" status="failed">
+	<errors>
+		<error>The field 'Name' is required.</error>
+		<error>The field 'Address' is required.</error>
+		<error>Please enter a valid email address.</error>
+	</errors>
+</filter>
+EOT;
+		$context['documentation'][] = contentBlueprintsEvents::processDocumentationCode($code);
+		$context['documentation'][] = new XMLElement('p', 'To enable the form validation in your form and choose the proper record containing the validation rules, add the following to your form (assuming that the record has the id 1):');
+		$code = <<<EOT
+<input type="hidden" name="formvalidation[formname]" value="1" />
+EOT;
+		$context['documentation'][] = contentBlueprintsEvents::processDocumentationCode($code);
 	}
 	
 	/**
